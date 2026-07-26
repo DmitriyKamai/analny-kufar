@@ -24,6 +24,7 @@ KUFAR_BASE_URL = "https://searchapi.kufar.by/v1/search/rendered-paginated"
 DEFAULT_MAX_PRICE = "1000000000"
 MAX_IMAGES_IN_GROUP = 10
 PLACEHOLDER_PHOTO_URL = "https://via.placeholder.com/1080"
+DEFAULT_ACCESS_PASSWORD = "anal"
 
 
 def default_data_dir() -> Path:
@@ -31,6 +32,23 @@ def default_data_dir() -> Path:
     if "AMVERA" in os.environ:
         return Path("/data")
     return Path.cwd()
+
+
+def env_secret(*names: str) -> str | None:
+    for name in names:
+        value = os.environ.get(name)
+        if value is not None and value.strip():
+            return value.strip()
+    return None
+
+
+def default_config() -> dict[str, Any]:
+    return {
+        "telegram": {},
+        "access-password": DEFAULT_ACCESS_PASSWORD,
+        "delays": {"query": 10, "loop": 1800},
+        "users": {},
+    }
 
 REGIONS = {
     1: "Брест",
@@ -291,9 +309,6 @@ def btn(text: str, data: str) -> dict[str, str]:
     return {"text": text, "callback_data": data}
 
 
-DEFAULT_ACCESS_PASSWORD = "anal"
-
-
 class App:
     def __init__(self, config_path: Path, cache_path: Path, once: bool = False, dry_run: bool = False) -> None:
         self.config_path = config_path
@@ -301,7 +316,12 @@ class App:
         self.once = once
         self.dry_run = dry_run
         self.lock = threading.RLock()
-        self.config = load_json(config_path)
+        if config_path.exists():
+            self.config = load_json(config_path)
+        else:
+            print(f'[CONFIG]: файл "{config_path}" не найден, используются значения по умолчанию', flush=True)
+            self.config = default_config()
+            self.persist_config()
         self.viewed_ads: dict[str, set[int]] = {}
         self.update_offset = 0
         self.user_state: dict[int, dict[str, Any]] = {}
@@ -310,18 +330,41 @@ class App:
         self.primed_queries: set[tuple[str, str]] = set()
         self.migrate_config()
         self.load_cache()
+        self.validate_secrets()
 
     @property
     def bot_token(self) -> str:
-        return str(self.config["telegram"]["bot-token"])
+        env_token = env_secret("TELEGRAM_BOT_TOKEN", "BOT_TOKEN")
+        if env_token:
+            return env_token
+        file_token = self.config.get("telegram", {}).get("bot-token")
+        if file_token:
+            return str(file_token).strip()
+        return ""
 
     @property
     def access_password(self) -> str:
+        env_password = env_secret("ACCESS_PASSWORD", "KUFAR_ACCESS_PASSWORD")
+        if env_password:
+            return env_password
         return str(self.config.get("access-password", DEFAULT_ACCESS_PASSWORD))
 
     @property
     def api_base(self) -> str:
         return f"https://api.telegram.org/bot{self.bot_token}"
+
+    def validate_secrets(self) -> None:
+        token = self.bot_token
+        if not token:
+            raise SystemExit(
+                "[ОШИБКА]: не задан токен бота. "
+                "Укажите переменную TELEGRAM_BOT_TOKEN (или BOT_TOKEN) "
+                "либо поле telegram.bot-token в конфигурации."
+            )
+        if ":" not in token:
+            raise SystemExit("[ОШИБКА]: токен бота выглядит некорректно (ожидается вид 123456:ABC...).")
+        source = "env" if env_secret("TELEGRAM_BOT_TOKEN", "BOT_TOKEN") else "config"
+        print(f"[CONFIG]: токен загружен из {source}", flush=True)
 
     def migrate_config(self) -> None:
         changed = False
