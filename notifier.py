@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import threading
 import time
@@ -23,6 +24,13 @@ KUFAR_BASE_URL = "https://searchapi.kufar.by/v1/search/rendered-paginated"
 DEFAULT_MAX_PRICE = "1000000000"
 MAX_IMAGES_IN_GROUP = 10
 PLACEHOLDER_PHOTO_URL = "https://via.placeholder.com/1080"
+
+
+def default_data_dir() -> Path:
+    # Amvera mounts persistent storage at /data (see amvera.yml persistenceMount).
+    if "AMVERA" in os.environ:
+        return Path("/data")
+    return Path.cwd()
 
 REGIONS = {
     1: "Брест",
@@ -341,6 +349,12 @@ class App:
             print("[CONFIG]: migrated to multi-user format", flush=True)
 
     def load_cache(self) -> None:
+        if not self.cache_path.exists():
+            self.viewed_ads = {}
+            self.persist_cache()
+            print(f'[CACHE]: создан пустой файл "{self.cache_path}"', flush=True)
+            return
+
         raw = load_json(self.cache_path)
         if isinstance(raw, list):
             known_users = [key for key in self.config.get("users", {}) if key.isdigit()]
@@ -988,9 +1002,10 @@ class App:
 
 
 def parse_args() -> argparse.Namespace:
+    data_dir = default_data_dir()
     parser = argparse.ArgumentParser(description="Анальный куфар — мониторинг объявлений Kufar")
-    parser.add_argument("--config", type=Path, default=Path.cwd() / CONFIGURATION_FILE_NAME)
-    parser.add_argument("--cache", type=Path, default=Path.cwd() / CACHE_FILE_NAME)
+    parser.add_argument("--config", type=Path, default=data_dir / CONFIGURATION_FILE_NAME)
+    parser.add_argument("--cache", type=Path, default=data_dir / CACHE_FILE_NAME)
     parser.add_argument("--once", action="store_true", help="Run one pass over configured queries and exit.")
     parser.add_argument("--dry-run", action="store_true", help="Do not send Telegram messages.")
     return parser.parse_args()

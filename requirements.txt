@@ -1,0 +1,1 @@
+# No third-party packages — notifier.py uses the Python standard library only.

@@ -170,11 +170,24 @@ https://searchapi.kufar.by/v1/search/rendered-paginated
 
 ```
 notifier.py                 # бот
-kufar-configuration.json    # токен, пароль, пользователи, задержки
+requirements.txt            # зависимости (пусто — только stdlib)
+amvera.yml                  # деплой на Amvera
+kufar-configuration.json    # токен, пароль, пользователи, задержки (локально / в /data)
 cached-data.json            # кэш отправленных объявлений по chat_id
 README.md
 LICENSE
 ```
+
+---
+
+## Деплой на Amvera
+
+1. Подключите репозиторий, сборка идёт по `amvera.yml` (Python 3.12 + `notifier.py`).
+2. В постоянное хранилище `/data` положите `kufar-configuration.json` (токен и пароль).
+3. Файл `cached-data.json` создастся сам в `/data` (или положите `{}`).
+4. На Amvera бот читает конфиг и кэш из `/data`, локально — из текущей папки.
+
+Бот не слушает HTTP-порт: это long-polling процесс.
 
 ---
 
