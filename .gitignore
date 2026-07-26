@@ -1,0 +1,18 @@
+# Secrets / local state
+kufar-configuration.json
+cached-data.json
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+.env
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
