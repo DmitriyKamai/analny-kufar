@@ -25,6 +25,15 @@ DEFAULT_MAX_PRICE = "1000000000"
 MAX_IMAGES_IN_GROUP = 10
 PLACEHOLDER_PHOTO_URL = "https://via.placeholder.com/1080"
 DEFAULT_ACCESS_PASSWORD = "anal"
+BOT_COMMANDS = [
+    {"command": "start", "description": "Запуск и вход"},
+    {"command": "menu", "description": "Главное меню"},
+    {"command": "list", "description": "Мои поиски"},
+    {"command": "add", "description": "Добавить поиск"},
+    {"command": "delays", "description": "Интервалы опроса"},
+    {"command": "status", "description": "Статус бота"},
+    {"command": "logout", "description": "Выйти"},
+]
 
 
 def default_data_dir() -> Path:
@@ -496,6 +505,12 @@ class App:
     def tg(self, method: str, payload: dict[str, Any] | None = None, timeout: int = 30) -> Any:
         return http_json(f"{self.api_base}/{method}", payload, timeout=timeout)
 
+    def setup_bot_menu(self) -> None:
+        """Register commands for the Telegram «Меню» button next to the input field."""
+        self.tg("setMyCommands", {"commands": BOT_COMMANDS})
+        self.tg("setChatMenuButton", {"menu_button": {"type": "commands"}})
+        print("[BOT]: command menu registered", flush=True)
+
     def send_text(self, chat_id: int, text: str, reply_markup: str | None = None) -> None:
         payload: dict[str, Any] = {"chat_id": chat_id, "text": text}
         if reply_markup is not None:
@@ -869,7 +884,7 @@ class App:
             self.ask_password(chat_id)
             return
 
-        if text.startswith("/menu"):
+        if text.startswith("/menu") or text.startswith("/help"):
             self.user_state.pop(chat_id, None)
             self.show_home(chat_id)
             return
@@ -885,6 +900,14 @@ class App:
             return
         if text.startswith("/status"):
             self.show_status(chat_id)
+            return
+        if text.startswith("/delays"):
+            delays = self.get_user_delays(chat_id)
+            self.send_text(
+                chat_id,
+                f"Интервал полного цикла сейчас: {delays['loop']} с\nВыберите новый:",
+                self.delays_markup(),
+            )
             return
         if text.startswith("/logout"):
             self.set_authorized(chat_id, False)
@@ -1035,6 +1058,12 @@ class App:
         if self.once:
             self.watcher_loop()
             return
+
+        if not self.dry_run:
+            try:
+                self.setup_bot_menu()
+            except Exception as exc:
+                print(f"[WARN (setup_bot_menu)]: {exc}", file=sys.stderr, flush=True)
 
         bot_thread = threading.Thread(target=self.bot_loop, name="telegram-bot", daemon=True)
         bot_thread.start()
