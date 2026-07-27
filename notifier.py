@@ -507,6 +507,7 @@ class App:
 
     def setup_bot_menu(self) -> None:
         """Register commands for the Telegram «Меню» button next to the input field."""
+        self.tg("deleteWebhook", {"drop_pending_updates": False})
         self.tg("setMyCommands", {"commands": BOT_COMMANDS})
         self.tg("setChatMenuButton", {"menu_button": {"type": "commands"}})
         print("[BOT]: command menu registered", flush=True)
@@ -968,8 +969,18 @@ class App:
                     except Exception as exc:
                         print(f"[ERROR (bot update)]: {exc}", file=sys.stderr, flush=True)
             except Exception as exc:
-                print(f"[ERROR (getUpdates)]: {exc}", file=sys.stderr, flush=True)
-                time.sleep(3)
+                message = str(exc)
+                if "409" in message:
+                    print(
+                        "[WARN (getUpdates)]: другой экземпляр бота уже опрашивает Telegram. "
+                        "Оставьте запущенным только один процесс (локально или на Amvera).",
+                        file=sys.stderr,
+                        flush=True,
+                    )
+                    time.sleep(15)
+                else:
+                    print(f"[ERROR (getUpdates)]: {exc}", file=sys.stderr, flush=True)
+                    time.sleep(3)
 
     def watcher_loop(self) -> None:
         print("[WATCHER]: started", flush=True)
